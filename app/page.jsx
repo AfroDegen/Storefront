@@ -1,194 +1,70 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Plus, Smartphone, Layers, Eye, EyeOff, ArrowUp, ArrowDown, Copy, Trash2 } from "lucide-react";
+import "./editor.css";
+import { REGISTRY, TYPES, STARTER_TYPES } from "../components/storefront/component-registry.js";
+import StorefrontRenderer from "../components/storefront/storefront-renderer.jsx";
+import ComponentInspector from "../components/storefront/component-inspector.jsx";
 import {
-  ShoppingBag,
-  Plus,
-  Smartphone,
-  Layers,
-  Pencil,
-  Eye
-} from "lucide-react";
+  createPage,
+  createComponent,
+  addComponent,
+  updateComponent,
+  duplicateComponent,
+  deleteComponent,
+  moveComponent,
+  getComponent
+} from "../lib/page-model.js";
+import { loadPage, savePage, clearPage } from "../lib/storage.js";
+
+function starterPage() {
+  return createPage(STARTER_TYPES.map((type) => createComponent(type, REGISTRY[type].defaults)));
+}
 
 export default function Home() {
-  const [selected, setSelected] = useState("hero");
+  const [page, setPage] = useState(() => starterPage());
+  const [selectedId, setSelectedId] = useState(null);
+  const [preview, setPreview] = useState(false);
+  const [newType, setNewType] = useState("hero");
+  const [loaded, setLoaded] = useState(false);
 
-  const [content, setContent] = useState({
-    storeName: "YOUR STORE",
-    heading: "Thoughtful gifts. Beautifully delivered.",
-    description: "Discover something special for someone you love.",
-    button: "Explore gifts"
-  });
+  // Restore the saved page after the first render, so server and browser HTML match.
+  useEffect(() => {
+    const saved = loadPage(TYPES);
+    if (saved) {
+      setPage(saved);
+      setSelectedId(saved.components[0]?.id ?? null);
+    } else {
+      setSelectedId((id) => id ?? page.components[0]?.id ?? null);
+    }
+    setLoaded(true);
+  }, []);
 
-  const updateContent = (field, value) => {
-    setContent((previous) => ({
-      ...previous,
-      [field]: value
-    }));
+  // Save every change, but only after the restore has run.
+  useEffect(() => {
+    if (loaded) savePage(page);
+  }, [page, loaded]);
+
+  const selected = getComponent(page, selectedId);
+  const items = page.components;
+
+  const add = () => {
+    const created = createComponent(newType, REGISTRY[newType].defaults);
+    setPage((prev) => addComponent(prev, created, selectedId));
+    setSelectedId(created.id);
   };
 
-  const components = [
-    { id: "header", name: "Header" },
-    { id: "hero", name: "Hero" },
-    { id: "products", name: "Product grid" }
-  ];
+  const duplicate = (id) => {
+    const before = new Set(items.map((item) => item.id));
+    const next = duplicateComponent(page, id);
+    const copy = next.components.find((item) => !before.has(item.id));
+    setPage(next);
+    if (copy) setSelectedId(copy.id);
+  };
 
-  return (
-    <main className="workspace">
-      <header className="topbar">
-        <div>
-          <span className="eyebrow">DESIGN STUDIO</span>
-          <h1>Drawing Board</h1>
-        </div>
-        <button className="preview-button">
-          <Eye size={16} />
-          Preview
-        </button>
-      </header>
-
-      <section className="canvas-section">
-        <div className="canvas-heading">
-          <span><Smartphone size={16} /> MOBILE CANVAS</span>
-          <span>375 × 812</span>
-        </div>
-
-        <div className="phone">
-          <div
-            className={`store-header ${
-              selected === "header" ? "selected" : ""
-            }`}
-            onClick={() => setSelected("header")}
-          >
-            <strong>{content.storeName}</strong>
-            <ShoppingBag size={21} />
-          </div>
-
-          <div
-            className={`hero ${
-              selected === "hero" ? "selected" : ""
-            }`}
-            onClick={() => setSelected("hero")}
-          >
-            <span className="component-label">HERO SECTION</span>
-            <h2>{content.heading}</h2>
-            <p>{content.description}</p>
-            <button className="shop-button">
-              {content.button}
-            </button>
-          </div>
-
-          <div
-            className={`products ${
-              selected === "products" ? "selected" : ""
-            }`}
-            onClick={() => setSelected("products")}
-          >
-            <span className="component-label">PRODUCT GRID</span>
-            <h3>Featured products</h3>
-
-            <div className="product-grid">
-              <div className="product">
-                <div className="product-image" />
-                <strong>Gift Box One</strong>
-                <span>₦25,000</span>
-              </div>
-
-              <div className="product">
-                <div className="product-image" />
-                <strong>Gift Box Two</strong>
-                <span>₦35,000</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="editor">
-        <div className="editor-heading">
-          <Layers size={19} />
-          <h2>Components</h2>
-        </div>
-
-        <div className="component-list">
-          {components.map((component) => (
-            <button
-              key={component.id}
-              className={
-                selected === component.id ? "active" : ""
-              }
-              onClick={() => setSelected(component.id)}
-            >
-              {component.name}
-              <Pencil size={15} />
-            </button>
-          ))}
-        </div>
-
-        <div className="inspector">
-          <h3>Edit {components.find(
-            (item) => item.id === selected
-          )?.name}</h3>
-
-          {selected === "header" && (
-            <label>
-              Store name
-              <input
-                value={content.storeName}
-                onChange={(e) =>
-                  updateContent("storeName", e.target.value)
-                }
-              />
-            </label>
-          )}
-
-          {selected === "hero" && (
-            <>
-              <label>
-                Heading
-                <textarea
-                  value={content.heading}
-                  onChange={(e) =>
-                    updateContent("heading", e.target.value)
-                  }
-                />
-              </label>
-
-              <label>
-                Description
-                <textarea
-                  value={content.description}
-                  onChange={(e) =>
-                    updateContent("description", e.target.value)
-                  }
-                />
-              </label>
-
-              <label>
-                Button text
-                <input
-                  value={content.button}
-                  onChange={(e) =>
-                    updateContent("button", e.target.value)
-                  }
-                />
-              </label>
-            </>
-          )}
-
-          {selected === "products" && (
-            <p className="helper-text">
-              Product editing will be added in the next version.
-            </p>
-          )}
-        </div>
-
-        <button className="add-button" onClick={() =>
-          setSelected("products")
-        }>
-          <Plus size={18} />
-          Add component
-        </button>
-      </section>
-    </main>
-  );
-}
+  const remove = (id) => {
+    const index = items.findIndex((item) => item.id === id);
+    const next = deleteComponent(page, id);
+    setPage(next);
+    
